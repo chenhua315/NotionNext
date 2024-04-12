@@ -20,7 +20,7 @@ const BLOG = {
 
   CUSTOM_MENU: process.env.NEXT_PUBLIC_CUSTOM_MENU || false, // 支持Menu 类型，从3.12.0版本起，各主题将逐步支持灵活的二级菜单配置，替代了原来的Page类型，此配置是试验功能、默认关闭。
 
-  AUTHOR: process.env.NEXT_PUBLIC_AUTHOR || '凯叔高效研究院', // 您的昵称 例如 tangly1024
+  AUTHOR: process.env.NEXT_PUBLIC_AUTHOR || '凯叔-高效工作', // 您的昵称 例如 tangly1024
   BIO: process.env.NEXT_PUBLIC_BIO || '探索AI的数字游民，陪您高效开心工作💼', // 作者简介
   LINK: process.env.NEXT_PUBLIC_LINK || 'https://kaishu.i9x.cn/', // 网站地址
   KEYWORDS: process.env.NEXT_PUBLIC_KEYWORD || '凯叔,AI,高效工作,ChatGPT,人工智能', // 网站关键词 英文逗号隔开
