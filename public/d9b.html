@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- 预加载音频资源 -->
+    <link rel="preload" href="https://cdn.jsdelivr.net/gh/AllenBug/files@main/videos/crq.m4a" as="audio" type="audio/mp4">
     <title>陈睿谦的毕业书</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&display=swap');
@@ -27,7 +29,6 @@
             touch-action: manipulation;
         }
 
-        /* 欢快的粒子背景 */
         #particles-js {
             position: absolute;
             width: 100%;
@@ -44,7 +45,6 @@
             z-index: 10;
         }
 
-        /* 彩虹色标题 */
         .main-title {
             font-size: 2.2rem;
             color: transparent;
@@ -72,7 +72,6 @@
             animation: linePulse 2s infinite;
         }
 
-        /* 可爱的卡片效果 */
         .handwriting {
             background: rgba(255, 255, 255, 0.9);
             border-radius: 15px;
@@ -114,7 +113,6 @@
             position: relative;
         }
 
-        /* 逐行动画延迟 */
         .handwriting p:nth-child(1) { animation-delay: 0.3s; }
         .handwriting p:nth-child(2) { animation-delay: 0.6s; }
         .handwriting p:nth-child(3) { animation-delay: 0.9s; }
@@ -124,7 +122,6 @@
         .handwriting p:nth-child(7) { animation-delay: 2.1s; }
         .handwriting p:nth-child(8) { animation-delay: 2.4s; }
 
-        /* 可爱的签名效果 */
         .signature {
             text-align: right;
             margin-top: 2rem;
@@ -159,7 +156,6 @@
             color: #888;
         }
 
-        /* 可爱的音频按钮 */
         .audio-btn {
             position: fixed;
             bottom: 20px;
@@ -187,7 +183,7 @@
             background: #ff5252;
         }
 
-        /* 视频容器样式 */
+        /* 视频容器修复样式 */
         .video-container {
             position: fixed;
             top: 0;
@@ -198,13 +194,29 @@
             opacity: 0;
             transition: opacity 1s;
             pointer-events: none;
+            object-fit: cover;
+            display: none; /* 初始隐藏 */
+        }
+
+        .video-container.active {
+            display: block; /* 激活时显示 */
         }
 
         .video-container.show {
             opacity: 1;
         }
 
-        /* 动画定义 */
+        .loading-message {
+            position: fixed;
+            bottom: 90px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            z-index: 100;
+        }
+
         @keyframes titleBounce {
             0%, 100% { transform: translateY(0); }
             50% { transform: translateY(-5px); }
@@ -254,7 +266,6 @@
             100% { transform: scale(2); opacity: 0; }
         }
 
-        /* 响应式调整 */
         @media (max-width: 500px) {
             .main-title { font-size: 1.8rem; }
             .handwriting { font-size: 1rem; padding: 20px; }
@@ -263,14 +274,15 @@
     </style>
 </head>
 <body>
-<!-- 欢快的粒子背景 -->
 <div id="particles-js"></div>
 
-<!-- 视频容器 -->
-<div class="video-container" id="videoContainer">
-    <video id="kidVideo" autoplay muted loop playsinline>
-        <source src="https://cdn.jsdelivr.net/gh/AllenBug/files@main/videos/crq.m4a" type="video/mp4">
-    </video>
+<!-- 视频容器（初始隐藏） -->
+<video class="video-container" id="kidVideo" loop playsinline>
+    <source src="https://cdn.jsdelivr.net/gh/AllenBug/files@main/videos/crq.m4a" type="video/mp4">
+</video>
+
+<div class="loading-message" id="loadingMessage">
+    音频加载中...
 </div>
 
 <div class="container">
@@ -298,20 +310,16 @@
     </div>
 </div>
 
-<!-- 可爱的音频按钮 -->
 <button class="audio-btn" id="audioBtn">♪</button>
 
-<!-- 音频 -->
-<audio id="kidVoice" preload="none">
+<audio id="kidVoice" preload="auto">
     <source src="https://cdn.jsdelivr.net/gh/AllenBug/files@main/videos/crq.m4a" type="audio/mp4">
 </audio>
 
-<!-- 粒子效果库 -->
 <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // 初始化粒子背景
         particlesJS("particles-js", {
             "particles": {
                 "number": {
@@ -403,15 +411,14 @@
             "retina_detect": true
         });
 
-        // 获取DOM元素
         const audio = document.getElementById('kidVoice');
         const video = document.getElementById('kidVideo');
-        const videoContainer = document.getElementById('videoContainer');
         const audioBtn = document.getElementById('audioBtn');
+        const loadingMessage = document.getElementById('loadingMessage');
         let isPlaying = false;
         let rippleInterval;
 
-        // 欢快的音频波纹效果
+        // 波纹动画
         const createRipple = () => {
             const colors = ['#ff6b6b', '#ffa502', '#70a1ff', '#7bed9f'];
             const color = colors[Math.floor(Math.random() * colors.length)];
@@ -431,79 +438,65 @@
             setTimeout(() => ripple.remove(), 1500);
         };
 
-        // 音频按钮点击事件
-        audioBtn.addEventListener('click', function() {
-            if(isPlaying) {
-                audio.pause();
-                video.pause();
-                audioBtn.textContent = '♪';
-                videoContainer.classList.remove('show');
-                clearInterval(rippleInterval);
+        // 缓冲检测
+        const checkBuffer = () => {
+            if (audio.readyState >= 3) {
+                loadingMessage.textContent = "点击播放按钮 ►";
+                return true;
             } else {
-                const playPromise = audio.play();
-                video.play().then(() => {
-                    videoContainer.classList.add('show');
-                });
-
-                playPromise.then(() => {
-                    audioBtn.textContent = '❚❚';
-                    // 开始彩色波纹效果
-                    rippleInterval = setInterval(createRipple, 800);
-                    isPlaying = true;
-                }).catch(e => {
-                    audioBtn.textContent = '!';
-                    setTimeout(() => audioBtn.textContent = '♪', 1000);
-                });
+                setTimeout(checkBuffer, 300);
+                return false;
             }
-            isPlaying = !isPlaying;
-        });
+        };
 
-        // 自动播放处理
-        function tryAutoPlay() {
-            // 先尝试播放视频（静音模式）
-            video.muted = true;
-            const videoPromise = video.play();
+        // 初始化媒体
+        audio.volume = 0.5;
+        audio.load(); // 强制预加载
 
-            // 然后尝试播放音频
-            audio.volume = 0.5;
-            const audioPromise = audio.play();
+        // 视频静音预加载（但不自动播放）
+        video.muted = true;
+        video.load();
 
-            if (videoPromise !== undefined) {
-                videoPromise.then(() => {
-                    videoContainer.classList.add('show');
-                    // 播放成功后再取消静音
-                    video.muted = false;
-                }).catch(e => {
-                    console.log('视频自动播放失败，需要用户交互');
-                });
-            }
+        // 开始检测缓冲状态
+        setTimeout(checkBuffer, 500);
 
-            if (audioPromise !== undefined) {
-                audioPromise.then(() => {
-                    audioBtn.textContent = '❚❚';
-                    isPlaying = true;
-                    rippleInterval = setInterval(createRipple, 800);
-                }).catch(e => {
-                    console.log('音频自动播放失败，需要用户交互');
-                });
-            }
-        }
+        // 播放控制
+        const playMedia = () => {
+            loadingMessage.style.display = "none";
 
-        // 延迟尝试自动播放
-        setTimeout(tryAutoPlay, 1000);
-
-        // 结束事件处理
-        audio.addEventListener('ended', function() {
-            audioBtn.textContent = '♪';
-            videoContainer.classList.remove('show');
-            isPlaying = false;
-            clearInterval(rippleInterval);
-        });
-
-        video.addEventListener('ended', function() {
+            // 同步启动视频（从0开始）
             video.currentTime = 0;
-            video.play();
+            video.muted = false;
+            video.classList.add('active', 'show');
+            video.play().catch(e => console.log('视频播放失败:', e));
+
+            // 播放音频
+            audio.play().then(() => {
+                audioBtn.textContent = '❚❚';
+                isPlaying = true;
+                rippleInterval = setInterval(createRipple, 800);
+            }).catch(e => {
+                loadingMessage.textContent = "请点击允许播放声音";
+                console.log('音频播放失败:', e);
+            });
+        };
+
+        // 暂停控制
+        const pauseMedia = () => {
+            audio.pause();
+            video.muted = true;
+            audioBtn.textContent = '♪';
+            clearInterval(rippleInterval);
+        };
+
+        // 按钮事件
+        audioBtn.addEventListener('click', () => {
+            isPlaying ? pauseMedia() : playMedia();
         });
+
+        // 结束事件
+        audio.addEventListener('ended', pauseMedia);
+        video.addEventListener('ended', () => video.play()); // 视频循环
     });
 </script>
 </body>
