@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <!-- 预加载音频资源 -->
-    <link rel="preload" href="https://cdn.jsdelivr.net/gh/AllenBug/files@main/videos/crq.m4a" as="audio" type="audio/mp4">
+    <link rel="preload" href="https://cdn.jsdelivr.net/gh/AllenBug/files@main/videos/crq.mp3" as="audio" type="audio/mp4">
     <title>陈睿谦的毕业书</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&display=swap');
@@ -210,11 +210,64 @@
             position: fixed;
             bottom: 90px;
             right: 20px;
-            background: rgba(255, 255, 255, 0.8);
+            background: rgba(255, 255, 255, 0.9);
             padding: 8px 12px;
             border-radius: 20px;
             font-size: 12px;
             z-index: 100;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            color: #ff6b6b;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        /* 新增样式 */
+        .play-hint {
+            animation: pulse 1.5s infinite;
+            cursor: pointer;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 30px;
+            z-index: 1000;
+            text-align: center;
+        }
+
+        .retry-btn {
+            position: fixed;
+            bottom: 90px;
+            right: 20px;
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 15px;
+            z-index: 1000;
+            display: none;
+        }
+
+        .progress-bar {
+            position: fixed;
+            bottom: 90px;
+            left: 20px;
+            width: calc(100% - 40px);
+            height: 4px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 2px;
+            z-index: 100;
+            display: none;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #ff6b6b, #ffa502);
+            border-radius: 2px;
+            transition: width 0.3s;
         }
 
         @keyframes titleBounce {
@@ -266,10 +319,26 @@
             100% { transform: scale(2); opacity: 0; }
         }
 
+        @keyframes pulse {
+            0% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(1.05); }
+            100% { transform: translate(-50%, -50%) scale(1); }
+        }
+
         @media (max-width: 500px) {
             .main-title { font-size: 1.8rem; }
             .handwriting { font-size: 1rem; padding: 20px; }
             .audio-btn { width: 50px; height: 50px; font-size: 20px; }
+            .loading-message {
+                bottom: 80px;
+                right: 15px;
+                font-size: 11px;
+                padding: 6px 10px;
+            }
+            .audio-btn {
+                bottom: 15px;
+                right: 15px;
+            }
         }
     </style>
 </head>
@@ -278,11 +347,16 @@
 
 <!-- 视频容器（初始隐藏） -->
 <video class="video-container" id="kidVideo" loop playsinline>
-    <source src="https://cdn.jsdelivr.net/gh/AllenBug/files@main/videos/crq.m4a" type="video/mp4">
+    <source src="https://cdn.jsdelivr.net/gh/AllenBug/files@main/videos/crq.mp3" type="video/mp4">
 </video>
 
+<!-- 新增元素 -->
 <div class="loading-message" id="loadingMessage">
     音频加载中...
+</div>
+<button class="retry-btn" id="retryBtn">重试</button>
+<div class="progress-bar" id="progressBar">
+    <div class="progress-bar-fill" id="progressBarFill"></div>
 </div>
 
 <div class="container">
@@ -313,13 +387,14 @@
 <button class="audio-btn" id="audioBtn">♪</button>
 
 <audio id="kidVoice" preload="auto">
-    <source src="https://cdn.jsdelivr.net/gh/AllenBug/files@main/videos/crq.m4a" type="audio/mp4">
+    <source src="https://cdn.jsdelivr.net/gh/AllenBug/files@main/videos/crq.mp3" type="audio/mp4">
 </audio>
 
 <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // 初始化粒子效果
         particlesJS("particles-js", {
             "particles": {
                 "number": {
@@ -411,12 +486,19 @@
             "retina_detect": true
         });
 
+        // 获取DOM元素
         const audio = document.getElementById('kidVoice');
         const video = document.getElementById('kidVideo');
         const audioBtn = document.getElementById('audioBtn');
         const loadingMessage = document.getElementById('loadingMessage');
+        const retryBtn = document.getElementById('retryBtn');
+        const progressBar = document.getElementById('progressBar');
+        const progressBarFill = document.getElementById('progressBarFill');
+
         let isPlaying = false;
         let rippleInterval;
+        let playHint = null;
+        let isAudioReady = false;
 
         // 波纹动画
         const createRipple = () => {
@@ -438,65 +520,181 @@
             setTimeout(() => ripple.remove(), 1500);
         };
 
-        // 缓冲检测
-        const checkBuffer = () => {
-            if (audio.readyState >= 3) {
-                loadingMessage.textContent = "点击播放按钮 ►";
-                return true;
-            } else {
-                setTimeout(checkBuffer, 300);
+        // 监控网络状态
+        function monitorNetwork() {
+            if (!navigator.onLine) {
+                loadingMessage.textContent = "网络未连接，请检查网络";
                 return false;
             }
-        };
 
-        // 初始化媒体
-        audio.volume = 0.5;
-        audio.load(); // 强制预加载
+            window.addEventListener('offline', () => {
+                loadingMessage.textContent = "网络已断开，请检查连接";
+                if (isPlaying) {
+                    pauseMedia();
+                }
+            });
 
-        // 视频静音预加载（但不自动播放）
-        video.muted = true;
-        video.load();
+            window.addEventListener('online', () => {
+                loadingMessage.textContent = "网络已恢复，请点击播放";
+            });
 
-        // 开始检测缓冲状态
-        setTimeout(checkBuffer, 500);
+            return navigator.onLine;
+        }
+
+        // 预加载媒体
+        function preloadMedia() {
+            if (!monitorNetwork()) return;
+
+            loadingMessage.textContent = "准备音频中...";
+            progressBar.style.display = 'block';
+
+            // 重置音频
+            audio.pause();
+            audio.currentTime = 0;
+
+            // 尝试预加载音频
+            audio.preload = "auto";
+            audio.load();
+
+            // 添加进度事件
+            audio.addEventListener('progress', updateProgress);
+            audio.addEventListener('canplaythrough', onCanPlayThrough);
+            audio.addEventListener('error', onMediaError);
+
+            // 预加载视频（静音）
+            video.preload = "auto";
+            video.muted = true;
+            video.load();
+        }
+
+        // 更新加载进度
+        function updateProgress() {
+            if (audio.buffered.length > 0) {
+                const bufferedEnd = audio.buffered.end(audio.buffered.length - 1);
+                const duration = audio.duration;
+                if (duration > 0) {
+                    const percent = (bufferedEnd / duration) * 100;
+                    progressBarFill.style.width = `${percent}%`;
+
+                    if (percent > 50) {
+                        loadingMessage.textContent = "音频加载中...";
+                    }
+                }
+            }
+        }
+
+        // 可以播放时
+        function onCanPlayThrough() {
+            isAudioReady = true;
+            progressBar.style.display = 'none';
+            loadingMessage.textContent = "点击播放按钮 ►";
+            retryBtn.style.display = 'none';
+        }
+
+        // 媒体错误处理
+        function onMediaError() {
+            isAudioReady = false;
+            console.error("音频错误:", audio.error);
+            loadingMessage.textContent = "音频加载失败";
+            retryBtn.style.display = 'block';
+            progressBar.style.display = 'none';
+
+            // 尝试使用备用源
+            if (audio.error && audio.error.code === 4) {
+                const fallbackSrc = "https://example.com/fallback-audio.mp3";
+                console.log("尝试备用音频源");
+                audio.src = fallbackSrc;
+                audio.load();
+            }
+        }
 
         // 播放控制
         const playMedia = () => {
-            loadingMessage.style.display = "none";
+            if (!isAudioReady) {
+                loadingMessage.textContent = "音频尚未准备好";
+                return;
+            }
 
-            // 同步启动视频（从0开始）
-            video.currentTime = 0;
-            video.muted = false;
-            video.classList.add('active', 'show');
-            video.play().catch(e => console.log('视频播放失败:', e));
+            // 确保音频从头开始播放
+            audio.currentTime = 0;
 
-            // 播放音频
-            audio.play().then(() => {
-                audioBtn.textContent = '❚❚';
-                isPlaying = true;
-                rippleInterval = setInterval(createRipple, 800);
-            }).catch(e => {
-                loadingMessage.textContent = "请点击允许播放声音";
-                console.log('音频播放失败:', e);
-            });
+            const playPromise = audio.play();
+
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    loadingMessage.style.display = "none";
+                    audioBtn.textContent = '❚❚';
+                    isPlaying = true;
+                    rippleInterval = setInterval(createRipple, 800);
+
+                    // 尝试播放视频
+                    video.currentTime = 0;
+                    video.muted = false;
+                    video.classList.add('active', 'show');
+                    video.play().catch(e => console.log('视频播放失败:', e));
+
+                    // 移除播放提示
+                    if (playHint) {
+                        playHint.remove();
+                        playHint = null;
+                    }
+                }).catch(e => {
+                    console.log('音频播放失败:', e);
+                    showPlayHint();
+                });
+            }
         };
+
+        // 显示播放提示
+        function showPlayHint() {
+            loadingMessage.textContent = "请点击允许播放声音";
+
+            if (!playHint) {
+                playHint = document.createElement('div');
+                playHint.className = 'play-hint';
+                playHint.textContent = '点击此处播放';
+                document.body.appendChild(playHint);
+
+                playHint.addEventListener('click', () => {
+                    playMedia();
+                });
+            }
+        }
 
         // 暂停控制
         const pauseMedia = () => {
             audio.pause();
             video.muted = true;
             audioBtn.textContent = '♪';
+            isPlaying = false;
             clearInterval(rippleInterval);
+            loadingMessage.style.display = "block";
+            loadingMessage.textContent = "点击播放按钮 ►";
         };
 
-        // 按钮事件
+        // 按钮事件 - 使用防抖处理
         audioBtn.addEventListener('click', () => {
-            isPlaying ? pauseMedia() : playMedia();
+            if (isPlaying) {
+                pauseMedia();
+            } else {
+                // 确保音频从头开始播放
+                audio.currentTime = 0;
+                playMedia();
+            }
+        });
+
+        // 重试按钮事件
+        retryBtn.addEventListener('click', () => {
+            retryBtn.style.display = 'none';
+            preloadMedia();
         });
 
         // 结束事件
         audio.addEventListener('ended', pauseMedia);
         video.addEventListener('ended', () => video.play()); // 视频循环
+
+        // 初始化
+        preloadMedia();
     });
 </script>
 </body>
