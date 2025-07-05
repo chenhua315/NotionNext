@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <!-- 预加载音频资源 -->
-    <link rel="preload" href="https://cdn.jsdelivr.net/gh/AllenBug/files@main/videos/crq.mp3" as="audio" type="audio/mp4">
+    <link rel="preload" href="https://cdn.jsdelivr.net/gh/AllenBug/files@main/videos/crq.mp3" as="audio" type="audio/mpeg">
     <title>陈睿谦的毕业书</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&display=swap');
@@ -183,29 +183,6 @@
             background: #ff5252;
         }
 
-        /* 视频容器修复样式 */
-        .video-container {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 5;
-            opacity: 0;
-            transition: opacity 1s;
-            pointer-events: none;
-            object-fit: cover;
-            display: none; /* 初始隐藏 */
-        }
-
-        .video-container.active {
-            display: block; /* 激活时显示 */
-        }
-
-        .video-container.show {
-            opacity: 1;
-        }
-
         .loading-message {
             position: fixed;
             bottom: 90px;
@@ -221,7 +198,6 @@
             transition: all 0.3s;
         }
 
-        /* 新增样式 */
         .play-hint {
             animation: pulse 1.5s infinite;
             cursor: pointer;
@@ -345,12 +321,13 @@
 <body>
 <div id="particles-js"></div>
 
-<!-- 视频容器（初始隐藏） -->
-<video class="video-container" id="kidVideo" loop playsinline>
-    <source src="https://cdn.jsdelivr.net/gh/AllenBug/files@main/videos/crq.mp3" type="video/mp4">
-</video>
+<!-- 音频元素 -->
+<audio id="kidVoice" preload="auto" loop>
+    <source src="https://cdn.jsdelivr.net/gh/AllenBug/files@main/videos/crq.mp3" type="audio/mpeg">
+    您的浏览器不支持音频元素
+</audio>
 
-<!-- 新增元素 -->
+<!-- 状态提示元素 -->
 <div class="loading-message" id="loadingMessage">
     音频加载中...
 </div>
@@ -385,10 +362,6 @@
 </div>
 
 <button class="audio-btn" id="audioBtn">♪</button>
-
-<audio id="kidVoice" preload="auto">
-    <source src="https://cdn.jsdelivr.net/gh/AllenBug/files@main/videos/crq.mp3" type="audio/mp4">
-</audio>
 
 <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
 
@@ -488,7 +461,6 @@
 
         // 获取DOM元素
         const audio = document.getElementById('kidVoice');
-        const video = document.getElementById('kidVideo');
         const audioBtn = document.getElementById('audioBtn');
         const loadingMessage = document.getElementById('loadingMessage');
         const retryBtn = document.getElementById('retryBtn');
@@ -560,11 +532,6 @@
             audio.addEventListener('progress', updateProgress);
             audio.addEventListener('canplaythrough', onCanPlayThrough);
             audio.addEventListener('error', onMediaError);
-
-            // 预加载视频（静音）
-            video.preload = "auto";
-            video.muted = true;
-            video.load();
         }
 
         // 更新加载进度
@@ -587,8 +554,45 @@
         function onCanPlayThrough() {
             isAudioReady = true;
             progressBar.style.display = 'none';
-            loadingMessage.textContent = "点击播放按钮 ►";
+            loadingMessage.textContent = "音频准备就绪";
             retryBtn.style.display = 'none';
+
+            // 尝试自动播放
+            tryAutoPlay();
+        }
+
+        // 尝试自动播放
+        function tryAutoPlay() {
+            const playPromise = audio.play();
+
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    // 自动播放成功
+                    loadingMessage.style.display = "none";
+                    audioBtn.textContent = '❚❚';
+                    isPlaying = true;
+                    rippleInterval = setInterval(createRipple, 800);
+                }).catch(error => {
+                    // 自动播放被阻止
+                    console.log('自动播放被阻止:', error);
+                    loadingMessage.textContent = "点击播放按钮 ►";
+                    showPlayHint();
+                });
+            }
+        }
+
+        // 显示播放提示
+        function showPlayHint() {
+            if (!playHint) {
+                playHint = document.createElement('div');
+                playHint.className = 'play-hint';
+                playHint.textContent = '点击此处播放音乐';
+                document.body.appendChild(playHint);
+
+                playHint.addEventListener('click', () => {
+                    playMedia();
+                });
+            }
         }
 
         // 媒体错误处理
@@ -627,12 +631,6 @@
                     isPlaying = true;
                     rippleInterval = setInterval(createRipple, 800);
 
-                    // 尝试播放视频
-                    video.currentTime = 0;
-                    video.muted = false;
-                    video.classList.add('active', 'show');
-                    video.play().catch(e => console.log('视频播放失败:', e));
-
                     // 移除播放提示
                     if (playHint) {
                         playHint.remove();
@@ -645,26 +643,9 @@
             }
         };
 
-        // 显示播放提示
-        function showPlayHint() {
-            loadingMessage.textContent = "请点击允许播放声音";
-
-            if (!playHint) {
-                playHint = document.createElement('div');
-                playHint.className = 'play-hint';
-                playHint.textContent = '点击此处播放';
-                document.body.appendChild(playHint);
-
-                playHint.addEventListener('click', () => {
-                    playMedia();
-                });
-            }
-        }
-
         // 暂停控制
         const pauseMedia = () => {
             audio.pause();
-            video.muted = true;
             audioBtn.textContent = '♪';
             isPlaying = false;
             clearInterval(rippleInterval);
@@ -672,13 +653,11 @@
             loadingMessage.textContent = "点击播放按钮 ►";
         };
 
-        // 按钮事件 - 使用防抖处理
+        // 按钮事件
         audioBtn.addEventListener('click', () => {
             if (isPlaying) {
                 pauseMedia();
             } else {
-                // 确保音频从头开始播放
-                audio.currentTime = 0;
                 playMedia();
             }
         });
@@ -691,10 +670,19 @@
 
         // 结束事件
         audio.addEventListener('ended', pauseMedia);
-        video.addEventListener('ended', () => video.play()); // 视频循环
 
         // 初始化
         preloadMedia();
+
+        // 添加点击事件监听器，允许在用户交互后播放
+        document.addEventListener('click', function firstInteraction() {
+            // 如果音频已准备好但未播放，尝试播放
+            if(isAudioReady && !isPlaying) {
+                tryAutoPlay();
+            }
+            // 移除事件监听器，避免重复触发
+            document.removeEventListener('click', firstInteraction);
+        });
     });
 </script>
 </body>
