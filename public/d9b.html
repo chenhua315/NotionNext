@@ -246,6 +246,22 @@
             transition: width 0.3s;
         }
 
+        /* 移动端提示 */
+        .mobile-hint {
+            display: none;
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.9);
+            padding: 10px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            font-size: 14px;
+        }
+
         @keyframes titleBounce {
             0%, 100% { transform: translateY(0); }
             50% { transform: translateY(-5px); }
@@ -315,14 +331,25 @@
                 bottom: 15px;
                 right: 15px;
             }
+            .mobile-hint {
+                font-size: 12px;
+                top: 10px;
+                left: 10px;
+                right: 10px;
+            }
         }
     </style>
 </head>
 <body>
 <div id="particles-js"></div>
 
+<!-- 移动端提示 -->
+<div class="mobile-hint" id="mobileHint">
+    请点击屏幕任意位置加载音频内容
+</div>
+
 <!-- 音频元素 -->
-<audio id="kidVoice" preload="auto" loop>
+<audio id="kidVoice" preload="none" loop>
     <source src="https://cdn.jsdelivr.net/gh/AllenBug/files@main/videos/crq.mp3" type="audio/mpeg">
     您的浏览器不支持音频元素
 </audio>
@@ -367,6 +394,14 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // 检测是否为移动设备
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+        // 如果是移动设备，显示提示
+        if (isMobile) {
+            document.getElementById('mobileHint').style.display = 'block';
+        }
+
         // 初始化粒子效果
         particlesJS("particles-js", {
             "particles": {
@@ -466,6 +501,7 @@
         const retryBtn = document.getElementById('retryBtn');
         const progressBar = document.getElementById('progressBar');
         const progressBarFill = document.getElementById('progressBarFill');
+        const mobileHint = document.getElementById('mobileHint');
 
         let isPlaying = false;
         let rippleInterval;
@@ -524,41 +560,38 @@
             audio.pause();
             audio.currentTime = 0;
 
-            // 尝试预加载音频
-            audio.preload = "auto";
+            // 移动端特殊处理 - 防止缓存问题
+            const audioSrc = audio.querySelector('source').src;
+            audio.querySelector('source').src = audioSrc + (audioSrc.indexOf('?') === -1 ? '?' : '&') + 't=' + Date.now();
+
+            // 移动端使用更保守的预加载策略
+            audio.preload = isMobile ? "metadata" : "auto";
             audio.load();
 
-            // 添加进度事件
+            // 添加事件监听
+            audio.addEventListener('loadedmetadata', onAudioReady);
+            audio.addEventListener('canplay', onAudioReady);
+            audio.addEventListener('canplaythrough', onAudioReady);
             audio.addEventListener('progress', updateProgress);
-            audio.addEventListener('canplaythrough', onCanPlayThrough);
             audio.addEventListener('error', onMediaError);
         }
 
-        // 更新加载进度
-        function updateProgress() {
-            if (audio.buffered.length > 0) {
-                const bufferedEnd = audio.buffered.end(audio.buffered.length - 1);
-                const duration = audio.duration;
-                if (duration > 0) {
-                    const percent = (bufferedEnd / duration) * 100;
-                    progressBarFill.style.width = `${percent}%`;
+        // 音频准备就绪
+        function onAudioReady() {
+            // 确保只触发一次
+            audio.removeEventListener('loadedmetadata', onAudioReady);
+            audio.removeEventListener('canplay', onAudioReady);
+            audio.removeEventListener('canplaythrough', onAudioReady);
 
-                    if (percent > 50) {
-                        loadingMessage.textContent = "音频加载中...";
-                    }
-                }
-            }
-        }
-
-        // 可以播放时
-        function onCanPlayThrough() {
             isAudioReady = true;
             progressBar.style.display = 'none';
-            loadingMessage.textContent = "音频准备就绪";
+            loadingMessage.textContent = isMobile ? "点击播放按钮 ►" : "音频准备就绪";
             retryBtn.style.display = 'none';
 
-            // 尝试自动播放
-            tryAutoPlay();
+            // 非移动端尝试自动播放
+            if (!isMobile) {
+                tryAutoPlay();
+            }
         }
 
         // 尝试自动播放
@@ -572,6 +605,11 @@
                     audioBtn.textContent = '❚❚';
                     isPlaying = true;
                     rippleInterval = setInterval(createRipple, 800);
+
+                    // 隐藏移动端提示
+                    if (isMobile) {
+                        mobileHint.style.display = 'none';
+                    }
                 }).catch(error => {
                     // 自动播放被阻止
                     console.log('自动播放被阻止:', error);
@@ -595,27 +633,47 @@
             }
         }
 
+        // 更新加载进度
+        function updateProgress() {
+            if (audio.buffered.length > 0) {
+                const bufferedEnd = audio.buffered.end(audio.buffered.length - 1);
+                const duration = audio.duration;
+                if (duration > 0) {
+                    const percent = (bufferedEnd / duration) * 100;
+                    progressBarFill.style.width = `${percent}%`;
+
+                    if (percent > 50) {
+                        loadingMessage.textContent = "音频加载中...";
+                    }
+                }
+            }
+        }
+
         // 媒体错误处理
         function onMediaError() {
             isAudioReady = false;
             console.error("音频错误:", audio.error);
-            loadingMessage.textContent = "音频加载失败";
+
+            let errorMsg = "音频加载失败";
+            if (audio.error) {
+                switch(audio.error.code) {
+                    case 1: errorMsg = "用户中止加载"; break;
+                    case 2: errorMsg = "网络错误"; break;
+                    case 3: errorMsg = "解码错误"; break;
+                    case 4: errorMsg = "不支持的格式"; break;
+                }
+            }
+
+            loadingMessage.textContent = errorMsg;
             retryBtn.style.display = 'block';
             progressBar.style.display = 'none';
-
-            // 尝试使用备用源
-            if (audio.error && audio.error.code === 4) {
-                const fallbackSrc = "https://example.com/fallback-audio.mp3";
-                console.log("尝试备用音频源");
-                audio.src = fallbackSrc;
-                audio.load();
-            }
         }
 
         // 播放控制
         const playMedia = () => {
             if (!isAudioReady) {
                 loadingMessage.textContent = "音频尚未准备好";
+                preloadMedia();
                 return;
             }
 
@@ -630,6 +688,11 @@
                     audioBtn.textContent = '❚❚';
                     isPlaying = true;
                     rippleInterval = setInterval(createRipple, 800);
+
+                    // 隐藏移动端提示
+                    if (isMobile) {
+                        mobileHint.style.display = 'none';
+                    }
 
                     // 移除播放提示
                     if (playHint) {
@@ -671,18 +734,31 @@
         // 结束事件
         audio.addEventListener('ended', pauseMedia);
 
-        // 初始化
-        preloadMedia();
+        // 移动端首次触摸事件处理
+        if (isMobile) {
+            const handleFirstTouch = () => {
+                // 隐藏提示
+                mobileHint.style.display = 'none';
+                // 预加载音频
+                preloadMedia();
+                // 移除事件监听
+                document.removeEventListener('touchstart', handleFirstTouch);
+                document.removeEventListener('click', handleFirstTouch);
+            };
 
-        // 添加点击事件监听器，允许在用户交互后播放
+            document.addEventListener('touchstart', handleFirstTouch, { once: true });
+            document.addEventListener('click', handleFirstTouch, { once: true });
+        } else {
+            // 桌面端直接预加载
+            preloadMedia();
+        }
+
+        // 统一点击/触摸事件处理
         document.addEventListener('click', function firstInteraction() {
-            // 如果音频已准备好但未播放，尝试播放
-            if(isAudioReady && !isPlaying) {
+            if (isAudioReady && !isPlaying) {
                 tryAutoPlay();
             }
-            // 移除事件监听器，避免重复触发
-            document.removeEventListener('click', firstInteraction);
-        });
+        }, { once: true });
     });
 </script>
 </body>
