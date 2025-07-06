@@ -176,6 +176,8 @@
             font-size: 24px;
             cursor: pointer;
             transition: all 0.3s;
+            -webkit-tap-highlight-color: rgba(0,0,0,0);
+            touch-action: manipulation;
         }
 
         .audio-btn:hover {
@@ -250,16 +252,30 @@
         .mobile-hint {
             display: none;
             position: fixed;
-            top: 20px;
-            left: 20px;
-            right: 20px;
-            background: rgba(255,255,255,0.9);
-            padding: 10px;
-            border-radius: 10px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px 20px;
+            border-radius: 15px;
             text-align: center;
             z-index: 1000;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-            font-size: 14px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            font-size: 16px;
+            max-width: 80%;
+            border: 2px solid #ffcc5c;
+            animation: pulse 1.5s infinite;
+        }
+
+        /* 添加点击区域扩大效果 */
+        .audio-btn::after {
+            content: '';
+            position: absolute;
+            top: -15px;
+            left: -15px;
+            right: -15px;
+            bottom: -15px;
+            border-radius: 50%;
         }
 
         @keyframes titleBounce {
@@ -320,22 +336,22 @@
         @media (max-width: 500px) {
             .main-title { font-size: 1.8rem; }
             .handwriting { font-size: 1rem; padding: 20px; }
-            .audio-btn { width: 50px; height: 50px; font-size: 20px; }
+            .audio-btn {
+                width: 70px;
+                height: 70px;
+                font-size: 28px;
+                bottom: 25px;
+                right: 25px;
+            }
             .loading-message {
-                bottom: 80px;
-                right: 15px;
+                bottom: 100px;
+                right: 25px;
                 font-size: 11px;
                 padding: 6px 10px;
             }
-            .audio-btn {
-                bottom: 15px;
-                right: 15px;
-            }
             .mobile-hint {
-                font-size: 12px;
-                top: 10px;
-                left: 10px;
-                right: 10px;
+                font-size: 14px;
+                padding: 12px 18px;
             }
         }
     </style>
@@ -344,8 +360,9 @@
 <div id="particles-js"></div>
 
 <!-- 移动端提示 -->
-<div class="mobile-hint" id="mobileHint">
-    请点击屏幕任意位置加载音频内容
+<div class="mobile-hint" id="mobileHint" style="display:none;">
+    🎵 点击下方圆形按钮播放音频 🎵
+    <p style="font-size: 0.8em; margin-top: 8px;">(首次使用需要点击激活)</p>
 </div>
 
 <!-- 音频元素 -->
@@ -393,115 +410,31 @@
 <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
+    // 使用window.onload确保所有资源加载完成
+    window.onload = function() {
         // 检测是否为移动设备
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-        // 如果是移动设备，显示提示
-        if (isMobile) {
-            document.getElementById('mobileHint').style.display = 'block';
+        // 安全获取DOM元素
+        const getElement = (id) => {
+            const el = document.getElementById(id);
+            if (!el) console.error(`元素 ${id} 未找到`);
+            return el;
+        };
+
+        const audio = getElement('kidVoice');
+        const audioBtn = getElement('audioBtn');
+        const loadingMessage = getElement('loadingMessage');
+        const retryBtn = getElement('retryBtn');
+        const progressBar = getElement('progressBar');
+        const progressBarFill = getElement('progressBarFill');
+        const mobileHint = getElement('mobileHint');
+
+        // 如果关键元素缺失，停止执行
+        if (!audio || !audioBtn || !loadingMessage) {
+            console.error('关键元素缺失，无法继续执行');
+            return;
         }
-
-        // 初始化粒子效果
-        particlesJS("particles-js", {
-            "particles": {
-                "number": {
-                    "value": 60,
-                    "density": {
-                        "enable": true,
-                        "value_area": 800
-                    }
-                },
-                "color": {
-                    "value": ["#ff6b6b", "#ffa502", "#70a1ff", "#7bed9f"]
-                },
-                "shape": {
-                    "type": "circle",
-                    "stroke": {
-                        "width": 0,
-                        "color": "#000"
-                    }
-                },
-                "opacity": {
-                    "value": 0.7,
-                    "random": true,
-                    "anim": {
-                        "enable": true,
-                        "speed": 1,
-                        "opacity_min": 0.3,
-                        "sync": false
-                    }
-                },
-                "size": {
-                    "value": 4,
-                    "random": true,
-                    "anim": {
-                        "enable": true,
-                        "speed": 2,
-                        "size_min": 1,
-                        "sync": false
-                    }
-                },
-                "line_linked": {
-                    "enable": true,
-                    "distance": 120,
-                    "color": "#ffcc5c",
-                    "opacity": 0.4,
-                    "width": 1
-                },
-                "move": {
-                    "enable": true,
-                    "speed": 1.5,
-                    "direction": "none",
-                    "random": true,
-                    "straight": false,
-                    "out_mode": "out",
-                    "bounce": false,
-                    "attract": {
-                        "enable": true,
-                        "rotateX": 600,
-                        "rotateY": 1200
-                    }
-                }
-            },
-            "interactivity": {
-                "detect_on": "canvas",
-                "events": {
-                    "onhover": {
-                        "enable": true,
-                        "mode": "bubble"
-                    },
-                    "onclick": {
-                        "enable": true,
-                        "mode": "repulse"
-                    },
-                    "resize": true
-                },
-                "modes": {
-                    "bubble": {
-                        "distance": 100,
-                        "size": 8,
-                        "duration": 2,
-                        "opacity": 0.8,
-                        "speed": 3
-                    },
-                    "repulse": {
-                        "distance": 100,
-                        "duration": 0.4
-                    }
-                }
-            },
-            "retina_detect": true
-        });
-
-        // 获取DOM元素
-        const audio = document.getElementById('kidVoice');
-        const audioBtn = document.getElementById('audioBtn');
-        const loadingMessage = document.getElementById('loadingMessage');
-        const retryBtn = document.getElementById('retryBtn');
-        const progressBar = document.getElementById('progressBar');
-        const progressBarFill = document.getElementById('progressBarFill');
-        const mobileHint = document.getElementById('mobileHint');
 
         let isPlaying = false;
         let rippleInterval;
@@ -515,10 +448,10 @@
 
             const ripple = document.createElement('div');
             ripple.style.position = 'fixed';
-            ripple.style.bottom = '20px';
-            ripple.style.right = '20px';
-            ripple.style.width = '60px';
-            ripple.style.height = '60px';
+            ripple.style.bottom = (isMobile ? '25px' : '20px');
+            ripple.style.right = (isMobile ? '25px' : '20px');
+            ripple.style.width = (isMobile ? '70px' : '60px');
+            ripple.style.height = (isMobile ? '70px' : '60px');
             ripple.style.borderRadius = '50%';
             ripple.style.border = `2px solid ${color}`;
             ripple.style.animation = 'ripple 1.5s linear forwards';
@@ -528,22 +461,37 @@
             setTimeout(() => ripple.remove(), 1500);
         };
 
+        // 移动端特殊处理
+        if (isMobile && mobileHint) {
+            mobileHint.style.display = 'block';
+
+            // 增加点击区域
+            audioBtn.style.width = '70px';
+            audioBtn.style.height = '70px';
+            audioBtn.style.fontSize = '28px';
+            audioBtn.style.bottom = '25px';
+            audioBtn.style.right = '25px';
+
+            // 防止iOS的300ms延迟
+            document.addEventListener('touchstart', function() {}, {passive: true});
+        }
+
         // 监控网络状态
         function monitorNetwork() {
             if (!navigator.onLine) {
-                loadingMessage.textContent = "网络未连接，请检查网络";
+                if (loadingMessage) loadingMessage.textContent = "网络未连接，请检查网络";
                 return false;
             }
 
             window.addEventListener('offline', () => {
-                loadingMessage.textContent = "网络已断开，请检查连接";
+                if (loadingMessage) loadingMessage.textContent = "网络已断开，请检查连接";
                 if (isPlaying) {
                     pauseMedia();
                 }
             });
 
             window.addEventListener('online', () => {
-                loadingMessage.textContent = "网络已恢复，请点击播放";
+                if (loadingMessage) loadingMessage.textContent = "网络已恢复，请点击播放";
             });
 
             return navigator.onLine;
@@ -553,16 +501,22 @@
         function preloadMedia() {
             if (!monitorNetwork()) return;
 
-            loadingMessage.textContent = "准备音频中...";
-            progressBar.style.display = 'block';
+            if (loadingMessage) {
+                loadingMessage.textContent = "准备音频中...";
+                loadingMessage.style.display = 'block';
+            }
+            if (progressBar) progressBar.style.display = 'block';
 
             // 重置音频
             audio.pause();
             audio.currentTime = 0;
 
-            // 移动端特殊处理 - 防止缓存问题
-            const audioSrc = audio.querySelector('source').src;
-            audio.querySelector('source').src = audioSrc + (audioSrc.indexOf('?') === -1 ? '?' : '&') + 't=' + Date.now();
+            // 解决移动端缓存问题
+            const source = audio.querySelector('source');
+            if (source) {
+                const audioSrc = source.src;
+                source.src = audioSrc + (audioSrc.indexOf('?') === -1 ? '?' : '&') + 't=' + Date.now();
+            }
 
             // 移动端使用更保守的预加载策略
             audio.preload = isMobile ? "metadata" : "auto";
@@ -584,9 +538,10 @@
             audio.removeEventListener('canplaythrough', onAudioReady);
 
             isAudioReady = true;
-            progressBar.style.display = 'none';
-            loadingMessage.textContent = isMobile ? "点击播放按钮 ►" : "音频准备就绪";
-            retryBtn.style.display = 'none';
+            if (progressBar) progressBar.style.display = 'none';
+            if (loadingMessage) loadingMessage.textContent = isMobile ? "点击播放按钮 ►" : "音频准备就绪";
+            if (retryBtn) retryBtn.style.display = 'none';
+            if (mobileHint) mobileHint.style.display = 'none';
 
             // 非移动端尝试自动播放
             if (!isMobile) {
@@ -601,19 +556,17 @@
             if (playPromise !== undefined) {
                 playPromise.then(() => {
                     // 自动播放成功
-                    loadingMessage.style.display = "none";
-                    audioBtn.textContent = '❚❚';
+                    if (loadingMessage) loadingMessage.style.display = 'none';
+                    if (audioBtn) audioBtn.textContent = '❚❚';
                     isPlaying = true;
                     rippleInterval = setInterval(createRipple, 800);
 
                     // 隐藏移动端提示
-                    if (isMobile) {
-                        mobileHint.style.display = 'none';
-                    }
+                    if (mobileHint) mobileHint.style.display = 'none';
                 }).catch(error => {
                     // 自动播放被阻止
                     console.log('自动播放被阻止:', error);
-                    loadingMessage.textContent = "点击播放按钮 ►";
+                    if (loadingMessage) loadingMessage.textContent = "点击播放按钮 ►";
                     showPlayHint();
                 });
             }
@@ -624,25 +577,29 @@
             if (!playHint) {
                 playHint = document.createElement('div');
                 playHint.className = 'play-hint';
-                playHint.textContent = '点击此处播放音乐';
+                playHint.textContent = '点击此处播放';
                 document.body.appendChild(playHint);
 
                 playHint.addEventListener('click', () => {
                     playMedia();
+                    if (playHint) {
+                        playHint.remove();
+                        playHint = null;
+                    }
                 });
             }
         }
 
         // 更新加载进度
         function updateProgress() {
-            if (audio.buffered.length > 0) {
+            if (audio.buffered.length > 0 && progressBarFill) {
                 const bufferedEnd = audio.buffered.end(audio.buffered.length - 1);
                 const duration = audio.duration;
                 if (duration > 0) {
                     const percent = (bufferedEnd / duration) * 100;
                     progressBarFill.style.width = `${percent}%`;
 
-                    if (percent > 50) {
+                    if (percent > 50 && loadingMessage) {
                         loadingMessage.textContent = "音频加载中...";
                     }
                 }
@@ -664,15 +621,15 @@
                 }
             }
 
-            loadingMessage.textContent = errorMsg;
-            retryBtn.style.display = 'block';
-            progressBar.style.display = 'none';
+            if (loadingMessage) loadingMessage.textContent = errorMsg;
+            if (retryBtn) retryBtn.style.display = 'block';
+            if (progressBar) progressBar.style.display = 'none';
         }
 
         // 播放控制
         const playMedia = () => {
             if (!isAudioReady) {
-                loadingMessage.textContent = "音频尚未准备好";
+                if (loadingMessage) loadingMessage.textContent = "音频尚未准备好";
                 preloadMedia();
                 return;
             }
@@ -684,15 +641,13 @@
 
             if (playPromise !== undefined) {
                 playPromise.then(() => {
-                    loadingMessage.style.display = "none";
-                    audioBtn.textContent = '❚❚';
+                    if (loadingMessage) loadingMessage.style.display = "none";
+                    if (audioBtn) audioBtn.textContent = '❚❚';
                     isPlaying = true;
                     rippleInterval = setInterval(createRipple, 800);
 
                     // 隐藏移动端提示
-                    if (isMobile) {
-                        mobileHint.style.display = 'none';
-                    }
+                    if (mobileHint) mobileHint.style.display = 'none';
 
                     // 移除播放提示
                     if (playHint) {
@@ -709,57 +664,152 @@
         // 暂停控制
         const pauseMedia = () => {
             audio.pause();
-            audioBtn.textContent = '♪';
+            if (audioBtn) audioBtn.textContent = '♪';
             isPlaying = false;
             clearInterval(rippleInterval);
-            loadingMessage.style.display = "block";
-            loadingMessage.textContent = "点击播放按钮 ►";
+            if (loadingMessage) {
+                loadingMessage.style.display = "block";
+                loadingMessage.textContent = "点击播放按钮 ►";
+            }
         };
 
-        // 按钮事件
-        audioBtn.addEventListener('click', () => {
+        // 按钮事件 - 同时处理触摸和点击
+        const handleAudioButtonClick = (e) => {
+            if (e.type === 'touchend') {
+                e.preventDefault(); // 防止触发两次
+            }
+
             if (isPlaying) {
                 pauseMedia();
             } else {
                 playMedia();
             }
-        });
+        };
+
+        if (audioBtn) {
+            audioBtn.addEventListener('click', handleAudioButtonClick);
+            audioBtn.addEventListener('touchend', handleAudioButtonClick);
+        }
 
         // 重试按钮事件
-        retryBtn.addEventListener('click', () => {
-            retryBtn.style.display = 'none';
-            preloadMedia();
-        });
+        if (retryBtn) {
+            retryBtn.addEventListener('click', () => {
+                if (retryBtn) retryBtn.style.display = 'none';
+                preloadMedia();
+            });
+        }
 
         // 结束事件
         audio.addEventListener('ended', pauseMedia);
 
-        // 移动端首次触摸事件处理
-        if (isMobile) {
-            const handleFirstTouch = () => {
-                // 隐藏提示
-                mobileHint.style.display = 'none';
-                // 预加载音频
-                preloadMedia();
-                // 移除事件监听
-                document.removeEventListener('touchstart', handleFirstTouch);
-                document.removeEventListener('click', handleFirstTouch);
-            };
-
-            document.addEventListener('touchstart', handleFirstTouch, { once: true });
-            document.addEventListener('click', handleFirstTouch, { once: true });
-        } else {
-            // 桌面端直接预加载
+        // 首次交互处理
+        const handleFirstInteraction = () => {
+            if (mobileHint) mobileHint.style.display = 'none';
             preloadMedia();
-        }
 
-        // 统一点击/触摸事件处理
-        document.addEventListener('click', function firstInteraction() {
-            if (isAudioReady && !isPlaying) {
-                tryAutoPlay();
-            }
-        }, { once: true });
-    });
+            // 移除事件监听
+            document.removeEventListener('click', handleFirstInteraction);
+            document.removeEventListener('touchstart', handleFirstInteraction);
+        };
+
+        // 安全添加事件监听
+        document.addEventListener('click', handleFirstInteraction, { once: true });
+        document.addEventListener('touchstart', handleFirstInteraction, { once: true });
+
+        // 初始化粒子效果
+        if (typeof particlesJS === 'function') {
+            particlesJS("particles-js", {
+                "particles": {
+                    "number": {
+                        "value": 60,
+                        "density": {
+                            "enable": true,
+                            "value_area": 800
+                        }
+                    },
+                    "color": {
+                        "value": ["#ff6b6b", "#ffa502", "#70a1ff", "#7bed9f"]
+                    },
+                    "shape": {
+                        "type": "circle",
+                        "stroke": {
+                            "width": 0,
+                            "color": "#000"
+                        }
+                    },
+                    "opacity": {
+                        "value": 0.7,
+                        "random": true,
+                        "anim": {
+                            "enable": true,
+                            "speed": 1,
+                            "opacity_min": 0.3,
+                            "sync": false
+                        }
+                    },
+                    "size": {
+                        "value": 4,
+                        "random": true,
+                        "anim": {
+                            "enable": true,
+                            "speed": 2,
+                            "size_min": 1,
+                            "sync": false
+                        }
+                    },
+                    "line_linked": {
+                        "enable": true,
+                        "distance": 120,
+                        "color": "#ffcc5c",
+                        "opacity": 0.4,
+                        "width": 1
+                    },
+                    "move": {
+                        "enable": true,
+                        "speed": 1.5,
+                        "direction": "none",
+                        "random": true,
+                        "straight": false,
+                        "out_mode": "out",
+                        "bounce": false,
+                        "attract": {
+                            "enable": true,
+                            "rotateX": 600,
+                            "rotateY": 1200
+                        }
+                    }
+                },
+                "interactivity": {
+                    "detect_on": "canvas",
+                    "events": {
+                        "onhover": {
+                            "enable": true,
+                            "mode": "bubble"
+                        },
+                        "onclick": {
+                            "enable": true,
+                            "mode": "repulse"
+                        },
+                        "resize": true
+                    },
+                    "modes": {
+                        "bubble": {
+                            "distance": 100,
+                            "size": 8,
+                            "duration": 2,
+                            "opacity": 0.8,
+                            "speed": 3
+                        },
+                        "repulse": {
+                            "distance": 100,
+                            "duration": 0.4
+                        }
+                    }
+                },
+                "retina_detect": true
+            });
+        }
+    };
 </script>
 </body>
 </html>
