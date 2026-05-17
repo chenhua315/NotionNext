@@ -226,7 +226,12 @@ function TopGroup(props) {
   }
 
   // 获取置顶推荐文章
-  const topPosts = getTopPosts({ latestPosts, allNavPages })
+  let topPosts = getTopPosts({ latestPosts, allNavPages })
+
+  // 如果没有推荐文章，显示最新文章作为替代
+  if (!topPosts || topPosts.length === 0) {
+    topPosts = latestPosts?.slice(0, 6) || []
+  }
 
   return (
     <div
@@ -237,27 +242,44 @@ function TopGroup(props) {
       <div
         id='top-group'
         className='w-full flex space-x-3 xl:space-x-0 xl:grid xl:grid-cols-3 xl:gap-3 xl:h-[342px]'>
-        {topPosts?.map((p, index) => {
-          return (
-            <SmartLink href={`${siteConfig('SUB_PATH', '')}/${p?.slug}`} key={index}>
-              <div className='cursor-pointer h-[164px] group relative flex flex-col w-52 xl:w-full overflow-hidden shadow bg-white dark:bg-black dark:text-white rounded-xl'>
-                <LazyImage
-                  priority={index === 0}
-                  className='h-24 object-cover'
-                  alt={p?.title}
-                  src={p?.pageCoverThumbnail || siteInfo?.pageCover}
-                />
-                <div className='group-hover:text-indigo-600 dark:group-hover:text-yellow-600 line-clamp-2 overflow-hidden m-2 font-semibold'>
-                  {p?.title}
+        {topPosts?.length > 0 ? (
+          topPosts.map((p, index) => {
+            return (
+              <SmartLink href={`${siteConfig('SUB_PATH', '')}/${p?.slug}`} key={index}>
+                <div className='cursor-pointer h-[164px] group relative flex flex-col w-52 xl:w-full overflow-hidden shadow bg-white dark:bg-black dark:text-white rounded-xl'>
+                  <LazyImage
+                    priority={index === 0}
+                    className='h-24 object-cover'
+                    alt={p?.title}
+                    src={p?.pageCoverThumbnail || siteInfo?.pageCover}
+                  />
+                  <div className='group-hover:text-indigo-600 dark:group-hover:text-yellow-600 line-clamp-2 overflow-hidden m-2 font-semibold'>
+                    {p?.title}
+                  </div>
+                  {/* hover 悬浮的 ‘荐’ 字 */}
+                  <div className='opacity-0 group-hover:opacity-100 -translate-x-4 group-hover:translate-x-0 duration-200 transition-all absolute -top-2 -left-2 bg-indigo-600 dark:bg-yellow-600  text-white rounded-xl overflow-hidden pr-2 pb-2 pl-4 pt-4 text-xs'>
+                    {locale.COMMON.RECOMMEND_BADGES}
+                  </div>
                 </div>
-                {/* hover 悬浮的 ‘荐’ 字 */}
-                <div className='opacity-0 group-hover:opacity-100 -translate-x-4 group-hover:translate-x-0 duration-200 transition-all absolute -top-2 -left-2 bg-indigo-600 dark:bg-yellow-600  text-white rounded-xl overflow-hidden pr-2 pb-2 pl-4 pt-4 text-xs'>
-                  {locale.COMMON.RECOMMEND_BADGES}
-                </div>
+              </SmartLink>
+            )
+          })
+        ) : (
+          // 如果连最新文章也没有，显示占位内容
+          <div className='w-full flex items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-gray-800 dark:to-gray-900 rounded-xl border border-gray-200 dark:border-gray-700'>
+            <div className='text-center p-8'>
+              <div className='w-16 h-16 mx-auto mb-4 bg-indigo-100 dark:bg-indigo-900 rounded-full flex items-center justify-center'>
+                <PlusSmall className='w-8 h-8 text-indigo-600 dark:text-indigo-400' />
               </div>
-            </SmartLink>
-          )
-        })}
+              <h3 className='text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2'>
+                {locale.COMMON.NO_POSTS || '暂无文章'}
+              </h3>
+              <p className='text-sm text-gray-500 dark:text-gray-400'>
+                {locale.COMMON.ADD_POSTS_TIP || '在 Notion 中添加文章后会自动显示在这里'}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
       {/* 一个大的跳转文章卡片 */}
       <TodayCard cRef={todayCardRef} siteInfo={siteInfo} />
